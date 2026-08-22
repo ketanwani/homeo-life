@@ -11,10 +11,14 @@ services:
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      # Local/dev default so `docker compose up` works with zero setup. Override with your own
+      # (generate via `npx auth secret`) for anything beyond local dev.
+      AUTH_SECRET: ${AUTH_SECRET:-UXLIxxqZ3TtXl500hfr68UegCm/sGncQpEzAV3iaEhQ=}
     ports:
       - "3000:3000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:16-alpine
@@ -27,6 +31,12 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/002-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homeolife -d homeolife"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres-data:

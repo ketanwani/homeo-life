@@ -1,10 +1,17 @@
 import Link from "next/link";
-import { ArrowLeft, LockKeyhole } from "lucide-react";
+import { redirect } from "next/navigation";
+import { ArrowLeft, LogOut, UserRound } from "lucide-react";
+import { auth, signOut } from "@/auth";
 import { getAppointments } from "@/lib/db";
 import { DoctorDashboard } from "../ui/doctor-dashboard";
 import { HomeoLifeLogo } from "../ui/logo";
 
 export default async function DoctorPage() {
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/login");
+  }
+
   const appointments = await getAppointments();
 
   return (
@@ -12,7 +19,19 @@ export default async function DoctorPage() {
       <div className="doctorTopbar">
         <Link className="brand" href="/"><HomeoLifeLogo /></Link>
         <Link className="textLink" href="/"><ArrowLeft size={17} /> Back to site</Link>
-        <div><LockKeyhole size={17} /> Auth placeholder</div>
+        <div className="doctorSession">
+          <span><UserRound size={17} /> {session.user.name ?? session.user.email}</span>
+          <form
+            action={async () => {
+              "use server";
+              await signOut({ redirectTo: "/" });
+            }}
+          >
+            <button className="button compact" type="submit">
+              <LogOut size={16} /> Sign out
+            </button>
+          </form>
+        </div>
       </div>
       <section className="section doctorDashboardPage">
         <div className="sectionHeading">

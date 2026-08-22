@@ -72,6 +72,17 @@ badge/sound) so she knows to open the inbox — she isn't required to watch it l
   `db/schema.sql` on container init).
 - No auth library wired in yet.
 
+## Workflow: Postgres + Docker for everything
+
+Decided 2026-08-22: stop relying on the in-memory seed fallback for real work — always run against
+Postgres via `docker compose up --build -d`. The in-memory fallback in `lib/db.ts` still exists and
+stays intact (useful if Docker isn't running), but it should not be the thing you're testing against.
+`db/seed.sql` (new) loads the same fixture content into real Postgres on first container boot, via
+`docker-entrypoint-initdb.d` alongside `db/schema.sql` — so the dockerized DB isn't empty. If you
+change the schema, remember `docker-entrypoint-initdb.d` scripts only run once against an empty data
+directory: `docker compose down -v` (drops the `postgres-data` volume) before `up --build` again to
+re-run them, or write an actual migration instead once this matters in a shared/deployed environment.
+
 ## Current status (as of 2026-08-22)
 
 Everything below is a **visual/UI shell with mock or stubbed data** unless noted. `npm run build`
@@ -88,10 +99,33 @@ works in the UI; date and time-slot options are **hardcoded arrays**, not real C
 Submit button just flips local `submitted` state — **no request is sent anywhere, nothing is
 persisted, no Calendly event is created.**
 
-**Doctor dashboard (`app/doctor/page.tsx`, `app/ui/doctor-dashboard.tsx`)** — no auth at all (literal
-"Auth placeholder" label in the topbar — anyone can load `/doctor`). Four tabs (Calendar,
-Appointments, Content editor, FAQ editor), all client-side with `defaultValue` inputs and buttons
-that don't call any API — nothing saves.
+**Doctor dashboard (`app/doctor/page.tsx`, `app/ui/doctor-dashboard.tsx`)** — **auth is now real**
+(NextAuth v5 / Auth.js, Credentials provider, JWT sessions). `/doctor/**` is protected by
+`middleware.ts`; unauthenticated requests redirect to `/login`. Four dashboard tabs (Calendar,
+Appointments, Content editor, FAQ editor) still don't save anything — that's next (see "Next steps").
+
+**Auth implementation details, if picking this back up:**
+- `auth.config.ts` — Edge-safe shared config (pages, session strategy, `trustHost: true`, the
+  `authorized`/`jwt`/`session` callbacks). Deliberately has **no** Node-only imports — both
+  `middleware.ts` (Edge runtime) and `auth.ts` (Node runtime) build on it. If you add anything to
+  auth config, decide which file it belongs in; putting a Node import in `auth.config.ts` breaks the
+  Edge middleware build again (bcrypt/pg-in-Edge was exactly this bug, fixed by the split).
+- `auth.ts` — full NextAuth instance: Credentials provider, `authorize()` calls
+  `getDoctorByEmail()` (`lib/db.ts`) then `bcrypt.compare`.
+- `lib/db.ts` → `getDoctorByEmail()` — Postgres `doctors` table when `DATABASE_URL` is set;
+  otherwise falls back to a single account from `DOCTOR_EMAIL`/`DOCTOR_PASSWORD_HASH`/`DOCTOR_NAME`
+  env vars (dev-only, no Postgres needed). Same fallback pattern as the rest of `lib/db.ts`.
+- **Creating/resetting the doctor account:** `npm run create-doctor -- <email> <password> "Full Name"`
+  (upserts into Postgres — needs `DATABASE_URL` set, e.g. via `.env` or inline on the command).
+  `npm run hash-password -- <password>` if you need a raw bcrypt hash instead (for the env-var
+  fallback path). Neither the schema nor `db/seed.sql` create a doctor row — passwords must be
+  hashed at runtime, not baked into a committed SQL file.
+- `AUTH_SECRET` is required (NextAuth throws in production without it). `docker-compose.yml` ships a
+  local/dev-only default so `docker compose up` works with zero setup — override it for anything
+  beyond local dev (`npx auth secret` to generate one).
+- Verified end-to-end against the dockerized Postgres: wrong password → `CredentialsSignin` redirect
+  to `/login`; correct password → session cookie set → `/doctor` renders with the doctor's name and a
+  working sign-out; sign-out clears the session and `/doctor` redirects to `/login` again.
 
 **API routes:**
 - `app/api/calendly/webhook/route.ts` — validates payload shape with zod, returns 200. **Does not
@@ -105,7 +139,6 @@ on first container boot only — no re-run/versioning story yet). No seed script
 `lib/seed.ts` data into real Postgres (so a fresh DB has empty tables until someone inserts rows).
 
 **Not started:**
-- Doctor auth (NextAuth/Clerk — mentioned only as a comment).
 - Any real Calendly API calls (create/list/reschedule event types, availability) — only the inbound
   webhook receiver stub exists.
 - Any real WhatsApp Cloud API calls (sending messages) — `WHATSAPP_ACCESS_TOKEN` /
@@ -131,12 +164,14 @@ on first container boot only — no re-run/versioning story yet). No seed script
 
 ## Next steps (suggested order — confirm with user before starting a big one)
 
-1. Get user sign-off on the WhatsApp handoff approach above (it shapes schema + a chunk of UI).
-2. Doctor auth (blocks all "doctor features" work being safe to ship).
+1. ~~Doctor auth~~ — done 2026-08-22 (NextAuth Credentials, see above).
+2. Get user sign-off on the WhatsApp handoff approach above (it shapes schema + a chunk of UI).
 3. Wire booking widget → real appointment creation (Postgres insert; Calendly integration or a
    native slot system — need to decide which).
 4. Calendly API integration (availability, create/reschedule) — or decide to go fully native instead
    of Calendly, per the booking-widget UI already built.
 5. WhatsApp Cloud API send + OpenAI-backed AI responder, with the chosen handoff design.
-6. Doctor CMS mutations (blog/case-story/FAQ create-update-publish) + media upload.
+6. Doctor CMS mutations (blog/case-story/FAQ create-update-publish) + media upload. Now unblocked by
+   auth — these routes/actions should require a session (see `middleware.ts` matcher — extend it to
+   `/api/doctor/:path*` once doctor-only API routes exist).
 7. Mobile responsiveness pass across `globals.css`.

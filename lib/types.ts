@@ -38,3 +38,10 @@ export type Appointment = {
   status: "scheduled" | "rescheduled" | "canceled" | "completed";
   notes?: string;
 };
+
+export type Doctor = {
+  id: string;
+  email: string;
+  fullName: string;
+  passwordHash: string;
+};

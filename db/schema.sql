@@ -59,6 +59,14 @@ create table if not exists testimonials (
   created_at timestamptz not null default now()
 );
 
+create table if not exists doctors (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  full_name text not null,
+  password_hash text not null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists whatsapp_threads (
   id uuid primary key default gen_random_uuid(),
   phone text not null,

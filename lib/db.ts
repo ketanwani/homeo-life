@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { appointments, contentPosts, services, testimonials } from "./seed";
-import type { Appointment, ContentPost, Service, Testimonial } from "./types";
+import type { Appointment, ContentPost, Doctor, Service, Testimonial } from "./types";
 
 let pool: Pool | null = null;
 
@@ -106,6 +106,43 @@ export async function getAppointments(): Promise<Appointment[]> {
     status: row.status,
     notes: row.notes ?? undefined
   }));
+}
+
+// There is only ever one doctor account today, so when DATABASE_URL isn't set (local dev without
+// Postgres, or Docker Compose not yet up) we fall back to a single account described by env vars
+// instead of a full in-memory table. Run `npm run hash-password -- <password>` to produce
+// DOCTOR_PASSWORD_HASH. Once a `doctors` row is created via `npm run create-doctor`, the real
+// Postgres path below takes over automatically.
+export async function getDoctorByEmail(email: string): Promise<Doctor | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const client = getPool();
+
+  if (!client) {
+    const fallbackEmail = process.env.DOCTOR_EMAIL?.trim().toLowerCase();
+    const fallbackHash = process.env.DOCTOR_PASSWORD_HASH;
+    if (!fallbackEmail || !fallbackHash || fallbackEmail !== normalizedEmail) return null;
+
+    return {
+      id: "env-doctor",
+      email: fallbackEmail,
+      fullName: process.env.DOCTOR_NAME || "Dr. Neha Mehta",
+      passwordHash: fallbackHash
+    };
+  }
+
+  const result = await client.query(
+    `select id, email, full_name, password_hash from doctors where email = $1 limit 1`,
+    [normalizedEmail]
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    email: row.email,
+    fullName: row.full_name,
+    passwordHash: row.password_hash
+  };
 }
 
 function mapPost(row: Record<string, any>): ContentPost {
