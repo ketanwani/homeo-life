@@ -229,6 +229,17 @@ on first container boot only — no re-run/versioning story yet). No seed script
 - No component/UI library — match the existing hand-written class-name + CSS pattern in
   `app/globals.css` rather than introducing Tailwind/etc. mid-project unless asked.
 
+## Decision: deployment / Wix cutover timing
+
+Decided 2026-08-22: the live site (myhomeolife.com, currently on Wix) stays on Wix for now. Do NOT
+suggest or plan a domain cutover until the core gaps below are closed — the site would otherwise
+replace Wix's working booking/contact flow with fake ones (booking widget doesn't persist, no real
+WhatsApp AI, no Calendly). Revisit deployment once real appointment creation (next item) and ideally
+the WhatsApp AI piece are done. When that conversation happens: this project is built for a VPS +
+Docker Compose deployment (Caddy/nginx for HTTPS), not serverless — the photo upload feature
+specifically depends on persistent local disk (a Docker volume) and would need rework (e.g. S3) on a
+platform like Vercel.
+
 ## Next steps (suggested order — confirm with user before starting a big one)
 
 1. ~~Doctor auth~~ — done 2026-08-22 (NextAuth Credentials, see above).
