@@ -20,17 +20,19 @@ import {
   Star
 } from "lucide-react";
 import { getFaqs, getPublishedPosts, getServices, getTestimonials } from "@/lib/db";
+import { getDoctorPhotoUrl } from "@/lib/doctor-photo";
 import { formatMoney, getWhatsAppUrl } from "@/lib/site";
 import { BookingWidget } from "./ui/booking-widget";
 import { HomeoLifeLogo } from "./ui/logo";
 
 export default async function HomePage() {
-  const [services, blogs, stories, faqs, testimonials] = await Promise.all([
+  const [services, blogs, stories, faqs, testimonials, doctorPhotoUrl] = await Promise.all([
     getServices(),
     getPublishedPosts("blog"),
     getPublishedPosts("case_story"),
     getFaqs(),
-    getTestimonials()
+    getTestimonials(),
+    getDoctorPhotoUrl()
   ]);
 
   const whatsAppUrl = getWhatsAppUrl(
@@ -132,8 +134,8 @@ export default async function HomePage() {
           </div>
           <div className="doctorVisual">
             <Image
-              src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=900&q=80"
-              alt="Doctor consultation"
+              src={doctorPhotoUrl}
+              alt="Dr. Neha Mehta"
               width={720}
               height={820}
             />

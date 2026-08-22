@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, LogOut, UserRound } from "lucide-react";
 import { auth, signOut } from "@/auth";
 import { getAppointments, getAvailability } from "@/lib/db";
+import { getDoctorPhotoUrl } from "@/lib/doctor-photo";
 import { DoctorDashboard } from "../ui/doctor-dashboard";
 import { HomeoLifeLogo } from "../ui/logo";
 
@@ -12,7 +13,11 @@ export default async function DoctorPage() {
     redirect("/login");
   }
 
-  const [appointments, availability] = await Promise.all([getAppointments(), getAvailability()]);
+  const [appointments, availability, photoUrl] = await Promise.all([
+    getAppointments(),
+    getAvailability(),
+    getDoctorPhotoUrl()
+  ]);
 
   return (
     <main className="doctorPage">
@@ -42,7 +47,7 @@ export default async function DoctorPage() {
             still UI-only and not yet wired to the database.
           </p>
         </div>
-        <DoctorDashboard appointments={appointments} availability={availability} />
+        <DoctorDashboard appointments={appointments} availability={availability} photoUrl={photoUrl} />
       </section>
     </main>
   );

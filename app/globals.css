@@ -1034,6 +1034,28 @@ textarea {
   display: none;
 }
 
+.profilePhotoPanel {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.profilePhotoPreview {
+  width: 140px;
+  height: 140px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: var(--mint);
+}
+
+.profilePhotoForm {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
 .roadmapGrid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -1224,7 +1246,8 @@ textarea {
   .availabilityRow,
   .slotGroup,
   .patientFields,
-  .appointmentList article {
+  .appointmentList article,
+  .profilePhotoPanel {
     grid-template-columns: 1fr;
   }
 }

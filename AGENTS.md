@@ -37,6 +37,25 @@ any session so the next tool/session (or the next person) picks up with full con
 > delegation done so the doctor can keep chatting with the patient but from their own, different
 > WhatsApp Business account? If not possible, what's the alternative?
 
+## Gotcha: don't serve runtime-written files from public/ in the standalone build
+
+Discovered 2026-08-22 while building doctor photo upload. Next.js's `output: "standalone"`
+production server (`server.js`) builds its static-asset route table once at **process boot** by
+scanning `public/`. A file created under `public/` *after* the process has started — e.g. a file a
+user uploads at runtime — 404s until the container restarts, even though the file is genuinely on
+disk and readable. Confirmed by reproducing it directly: wrote a file into the running container's
+mounted volume, curled its URL → 404; restarted the container (no rebuild) → 200. A doctor uploading
+a photo for the first time obviously can't restart the container, so this would have silently broken
+the feature.
+
+Fix: never rely on the `public/` static passthrough for anything written at runtime. Serve it through
+a normal dynamic Route Handler instead (`app/api/doctor-photo/route.ts`, `export const dynamic =
+"force-dynamic"`) — those re-read from disk on every request with no boot-time manifest involved.
+Storage itself still lives on disk (a Docker volume, same idea as before), just outside `public/` now
+(`uploads/` at the repo root, see `lib/doctor-photo.ts`) so it's not accidentally routed through the
+static path again by a future edit. Apply the same pattern to any future runtime-uploaded file (blog
+images, case-story media, etc.) — do not put runtime uploads under `public/`.
+
 ## Decision: doctor availability (Calendly can't be the write target)
 
 Checked Calendly's API docs directly (developer.calendly.com + their community forum, staff-confirmed)
@@ -132,8 +151,21 @@ persisted, no Calendly event is created.**
 
 **Doctor dashboard (`app/doctor/page.tsx`, `app/ui/doctor-dashboard.tsx`)** — **auth is now real**
 (NextAuth v5 / Auth.js, Credentials provider, JWT sessions). `/doctor/**` is protected by
-`middleware.ts`; unauthenticated requests redirect to `/login`. Four dashboard tabs (Calendar,
-Appointments, Content editor, FAQ editor) still don't save anything — that's next (see "Next steps").
+`middleware.ts`; unauthenticated requests redirect to `/login`. Five tabs: Calendar (real, see
+availability decision below), **Profile photo (real, see below)**, and Appointments/Content
+editor/FAQ, which still don't save anything — that's next (see "Next steps").
+
+**Doctor profile photo — done 2026-08-22.** Uploading replaces the homepage "About the doctor" image
+(previously a hardcoded Unsplash stock photo, `app/page.tsx`). `app/doctor/actions.ts` →
+`uploadDoctorPhoto` (auth-checked, JPEG/PNG/WebP only, 5MB cap, deletes any previous `doctor-photo.*`
+before writing the new one). Storage is a plain file in `uploads/` at the repo root (Docker volume
+`doctor-uploads`, see docker-compose.yml) — **not** `public/`, and specifically served through
+`app/api/doctor-photo/route.ts` rather than Next's static-folder passthrough; see the gotcha above for
+why that distinction matters (it's not a style choice, the naive version silently 404s on every
+doctor's first upload). `lib/doctor-photo.ts` → `getDoctorPhotoUrl()` returns the Unsplash fallback
+URL when nothing's been uploaded yet, else `/api/doctor-photo?v=<mtime>` (cache-busted per upload).
+Verified end-to-end against the dockerized container, including reproducing and then re-testing the
+exact "brand-new file, zero restarts" scenario the gotcha above describes.
 
 **Auth implementation details, if picking this back up:**
 - `auth.config.ts` — Edge-safe shared config (pages, session strategy, `trustHost: true`, the
@@ -179,7 +211,9 @@ on first container boot only — no re-run/versioning story yet). No seed script
 - AI integration — `OPENAI_API_KEY` env var exists but is unused in code; no model calls anywhere.
 - The AI ↔ doctor WhatsApp handoff (see decision above).
 - Media upload/storage for blog/case-story images & videos (file input exists in the dashboard UI,
-  nothing behind it — no S3/Cloudinary/Vercel Blob wiring).
+  nothing behind it). The doctor profile photo (done, see above) establishes the pattern to reuse:
+  disk storage under `uploads/` + a dynamic route handler to serve it, not `public/` + S3/Cloudinary/
+  Vercel Blob aren't needed for this project's scale, just follow the same approach.
 - Mobile responsiveness pass — only 2 `@media` breakpoints exist in `globals.css` (~1200 lines); the
   "mobile-first" framing on the roadmap card is aspirational copy, not a verified property yet.
 - TikTok link is a `#` placeholder (Instagram link is real).
@@ -199,11 +233,13 @@ on first container boot only — no re-run/versioning story yet). No seed script
 
 1. ~~Doctor auth~~ — done 2026-08-22 (NextAuth Credentials, see above).
 2. ~~Doctor availability~~ — done 2026-08-22 (fully native, see decision above).
-3. Get user sign-off on the WhatsApp handoff approach above (it shapes schema + a chunk of UI).
-4. Wire booking widget → real appointment creation, using `doctor_availability` to generate real
+3. ~~Doctor profile photo~~ — done 2026-08-22 (see above).
+4. Get user sign-off on the WhatsApp handoff approach above (it shapes schema + a chunk of UI).
+5. Wire booking widget → real appointment creation, using `doctor_availability` to generate real
    bookable slots (minus existing appointments) instead of the current hardcoded date/time arrays.
-5. WhatsApp Cloud API send + OpenAI-backed AI responder, with the chosen handoff design.
-6. Doctor CMS mutations (blog/case-story/FAQ create-update-publish) + media upload. Now unblocked by
-   auth — these routes/actions should require a session (see `middleware.ts` matcher — extend it to
+6. WhatsApp Cloud API send + OpenAI-backed AI responder, with the chosen handoff design.
+7. Doctor CMS mutations (blog/case-story/FAQ create-update-publish) + media upload — reuse the
+   photo-upload pattern (disk + dynamic route, not `public/`). Now unblocked by auth — these
+   routes/actions should require a session (see `middleware.ts` matcher — extend it to
    `/api/doctor/:path*` once doctor-only API routes exist).
-7. Mobile responsiveness pass across `globals.css`.
+8. Mobile responsiveness pass across `globals.css`.

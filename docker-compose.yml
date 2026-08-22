@@ -16,6 +16,8 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:-UXLIxxqZ3TtXl500hfr68UegCm/sGncQpEzAV3iaEhQ=}
     ports:
       - "3000:3000"
+    volumes:
+      - doctor-uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,3 +42,4 @@ services:
 
 volumes:
   postgres-data:
+  doctor-uploads:

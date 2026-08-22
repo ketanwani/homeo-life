@@ -9,3 +9,4 @@ Dockerfile
 dist
 out
 *.tsbuildinfo
+uploads

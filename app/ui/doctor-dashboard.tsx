@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import {
   CalendarDays,
+  Camera,
   ClipboardList,
   Download,
   ImagePlus,
@@ -11,10 +12,10 @@ import {
   Save,
   UploadCloud
 } from "lucide-react";
-import { saveAvailability } from "@/app/doctor/actions";
+import { saveAvailability, uploadDoctorPhoto } from "@/app/doctor/actions";
 import type { Appointment, DayAvailability } from "@/lib/types";
 
-type Panel = "calendar" | "appointments" | "editor" | "faq";
+type Panel = "calendar" | "appointments" | "editor" | "faq" | "profile";
 
 const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -60,12 +61,38 @@ function AvailabilityEditor({ availability }: { availability: DayAvailability[] 
   );
 }
 
+function DoctorPhotoUploader({ photoUrl }: { photoUrl: string }) {
+  const [state, formAction, isPending] = useActionState(uploadDoctorPhoto, { ok: false });
+
+  return (
+    <div className="profilePhotoPanel">
+      {/* eslint-disable-next-line @next/next/no-img-element -- admin-only thumbnail, not worth Next/Image's optimizer overhead */}
+      <img className="profilePhotoPreview" src={photoUrl} alt="Current doctor profile photo" />
+      <form action={formAction} encType="multipart/form-data" className="profilePhotoForm">
+        <label className="uploadBox">
+          <ImagePlus size={22} />
+          Choose a new photo (JPEG, PNG, or WebP, up to 5MB)
+          <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required />
+        </label>
+        {state.message ? (
+          <p className={state.ok ? "availabilitySuccess" : "authError"}>{state.message}</p>
+        ) : null}
+        <button className="button compact" type="submit" disabled={isPending}>
+          <UploadCloud size={16} /> {isPending ? "Uploading..." : "Upload photo"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export function DashboardTabs({
   appointments,
-  availability
+  availability,
+  photoUrl
 }: {
   appointments: Appointment[];
   availability: DayAvailability[];
+  photoUrl: string;
 }) {
   const [active, setActive] = useState<Panel>("calendar");
   const nextAppointment = useMemo(() => appointments.find((item) => item.status !== "canceled"), [appointments]);
@@ -84,6 +111,9 @@ export function DashboardTabs({
         </button>
         <button className={active === "faq" ? "dashTab active" : "dashTab"} onClick={() => setActive("faq")}>
           <MessageSquareText size={18} /> FAQ
+        </button>
+        <button className={active === "profile" ? "dashTab active" : "dashTab"} onClick={() => setActive("profile")}>
+          <Camera size={18} /> Profile photo
         </button>
       </aside>
 
@@ -162,6 +192,18 @@ export function DashboardTabs({
             </div>
           </section>
         ) : null}
+
+        {active === "profile" ? (
+          <section className="dashPanel">
+            <div className="panelHeader">
+              <div>
+                <h3>Doctor profile photo</h3>
+                <p>Shown in the "About the doctor" section on the homepage.</p>
+              </div>
+            </div>
+            <DoctorPhotoUploader photoUrl={photoUrl} />
+          </section>
+        ) : null}
       </div>
     </div>
   );
@@ -169,10 +211,12 @@ export function DashboardTabs({
 
 export function DoctorDashboard({
   appointments,
-  availability
+  availability,
+  photoUrl
 }: {
   appointments: Appointment[];
   availability: DayAvailability[];
+  photoUrl: string;
 }) {
-  return <DashboardTabs appointments={appointments} availability={availability} />;
+  return <DashboardTabs appointments={appointments} availability={availability} photoUrl={photoUrl} />;
 }
