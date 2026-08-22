@@ -1,31 +1,53 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { CalendarCheck, CheckCircle2, Clock, MessageCircle, ShieldCheck, UserRound } from "lucide-react";
-import type { Service } from "@/lib/types";
+import { requestAppointment } from "../actions";
+import type { DaySlots } from "@/lib/booking";
 import { formatMoney } from "@/lib/site";
+import type { Service } from "@/lib/types";
 
-const timeSlots = ["10:00 AM", "11:30 AM", "4:00 PM", "6:30 PM"];
-const dateOptions = [
-  { label: "Mon, Aug 24", value: "2026-08-24" },
-  { label: "Tue, Aug 25", value: "2026-08-25" },
-  { label: "Fri, Aug 28", value: "2026-08-28" }
-];
-
-export function BookingWidget({ services }: { services: Service[] }) {
+export function BookingWidget({
+  services,
+  slotsByService
+}: {
+  services: Service[];
+  slotsByService: Record<string, DaySlots[]>;
+}) {
+  const [state, formAction, isPending] = useActionState(requestAppointment, { ok: false });
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
-  const [date, setDate] = useState(dateOptions[0].value);
-  const [time, setTime] = useState(timeSlots[0]);
-  const [submitted, setSubmitted] = useState(false);
+
+  const days = slotsByService[serviceId] ?? [];
+  const [date, setDate] = useState(days[0]?.date ?? "");
+  const [time, setTime] = useState(days[0]?.times[0]?.value ?? "");
+
+  useEffect(() => {
+    const nextDays = slotsByService[serviceId] ?? [];
+    setDate(nextDays[0]?.date ?? "");
+    setTime(nextDays[0]?.times[0]?.value ?? "");
+  }, [serviceId, slotsByService]);
 
   const selectedService = useMemo(
     () => services.find((service) => service.id === serviceId) ?? services[0],
     [serviceId, services]
   );
+  const selectedDay = days.find((day) => day.date === date);
+  const timesForDay = selectedDay?.times ?? [];
+  const selectedTimeLabel = timesForDay.find((slot) => slot.value === time)?.label;
+
+  function handleDateChange(nextDate: string) {
+    setDate(nextDate);
+    const nextDay = days.find((day) => day.date === nextDate);
+    setTime(nextDay?.times[0]?.value ?? "");
+  }
 
   return (
     <div className="bookingWidget">
-      <div className="bookingForm">
+      <form className="bookingForm" action={formAction}>
+        <input type="hidden" name="serviceId" value={serviceId} />
+        <input type="hidden" name="date" value={date} />
+        <input type="hidden" name="time" value={time} />
+
         <div className="bookingIntro">
           <span className="formKicker">Step 1 of 3</span>
           <h3>Book a consultation</h3>
@@ -43,66 +65,75 @@ export function BookingWidget({ services }: { services: Service[] }) {
           </select>
         </label>
 
-        <div className="slotGroup" aria-label="Choose appointment date">
-          {dateOptions.map((option) => (
-            <button
-              className={date === option.value ? "slotButton active" : "slotButton"}
-              key={option.value}
-              onClick={() => setDate(option.value)}
-              type="button"
-            >
-              <CalendarCheck size={16} />
-              {option.label}
-            </button>
-          ))}
-        </div>
+        {days.length === 0 ? (
+          <p className="authError">
+            No online slots are open for this service right now. Please message us on WhatsApp to
+            arrange a time.
+          </p>
+        ) : (
+          <>
+            <div className="slotGroup" aria-label="Choose appointment date">
+              {days.map((day) => (
+                <button
+                  className={date === day.date ? "slotButton active" : "slotButton"}
+                  key={day.date}
+                  onClick={() => handleDateChange(day.date)}
+                  type="button"
+                >
+                  <CalendarCheck size={16} />
+                  {day.label}
+                </button>
+              ))}
+            </div>
 
-        <div className="slotGroup" aria-label="Choose appointment time">
-          {timeSlots.map((slot) => (
-            <button
-              className={time === slot ? "slotButton active" : "slotButton"}
-              key={slot}
-              onClick={() => setTime(slot)}
-              type="button"
-            >
-              <Clock size={16} />
-              {slot}
-            </button>
-          ))}
-        </div>
+            <div className="slotGroup" aria-label="Choose appointment time">
+              {timesForDay.map((slot) => (
+                <button
+                  className={time === slot.value ? "slotButton active" : "slotButton"}
+                  key={slot.value}
+                  onClick={() => setTime(slot.value)}
+                  type="button"
+                >
+                  <Clock size={16} />
+                  {slot.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="patientFields">
           <label>
             Full name
-            <input placeholder="Your name" />
+            <input name="fullName" placeholder="Your name" required />
           </label>
           <label>
             WhatsApp number
-            <input placeholder="+65 9000 0000" />
+            <input name="phone" placeholder="+65 9000 0000" required />
           </label>
           <label>
             Email
-            <input placeholder="you@example.com" />
+            <input name="email" type="email" placeholder="you@example.com" />
           </label>
           <label>
             Main concern
-            <textarea placeholder="Briefly describe what you need help with." />
+            <textarea name="concern" placeholder="Briefly describe what you need help with." />
           </label>
         </div>
 
-        <button className="button primary full" onClick={() => setSubmitted(true)} type="button">
+        {state.message ? <p className={state.ok ? "availabilitySuccess" : "authError"}>{state.message}</p> : null}
+
+        <button className="button primary full" type="submit" disabled={isPending || !date || !time}>
           <CheckCircle2 size={18} />
-          Request appointment
+          {isPending ? "Requesting..." : "Request appointment"}
         </button>
-      </div>
+      </form>
 
       <aside className="bookingSummary">
         <div className="summaryIcon"><UserRound size={24} /></div>
         <span>Selected appointment</span>
         <strong>{selectedService?.title ?? "Consultation"}</strong>
-        <p>
-          {dateOptions.find((option) => option.value === date)?.label} at {time}
-        </p>
+        <p>{selectedDay ? `${selectedDay.label} at ${selectedTimeLabel ?? "--"}` : "Choose a date and time"}</p>
         {selectedService ? (
           <dl>
             <div>
@@ -120,10 +151,10 @@ export function BookingWidget({ services }: { services: Service[] }) {
           <div><MessageCircle size={17} /> WhatsApp confirmation</div>
           <div><CalendarCheck size={17} /> Easy rescheduling</div>
         </div>
-        {submitted ? (
+        {state.ok ? (
           <div className="confirmationNote">
             <CheckCircle2 size={18} />
-            Your request is ready. In production this will reserve the slot and send confirmation by WhatsApp/email.
+            {state.message}
           </div>
         ) : null}
       </aside>

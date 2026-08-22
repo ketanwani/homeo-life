@@ -19,11 +19,18 @@ import {
   Sparkles,
   Star
 } from "lucide-react";
+import { getAvailableSlotsByService } from "@/lib/booking";
 import { getFaqs, getPublishedPosts, getServices, getTestimonials } from "@/lib/db";
 import { getDoctorPhotoUrl } from "@/lib/doctor-photo";
 import { formatMoney, getWhatsAppUrl } from "@/lib/site";
 import { BookingWidget } from "./ui/booking-widget";
 import { HomeoLifeLogo } from "./ui/logo";
+
+// This page is statically rendered, but getAvailableSlotsByService() depends on "now" (the lead-time
+// cutoff, which of the 21 upcoming days are in range) -- that goes stale over time even with zero
+// new bookings, not just when an appointment is created (revalidatePath in app/actions.ts handles
+// the latter). ISR here keeps the slot list from drifting more than a few minutes out of date.
+export const revalidate = 300;
 
 export default async function HomePage() {
   const [services, blogs, stories, faqs, testimonials, doctorPhotoUrl] = await Promise.all([
@@ -34,6 +41,7 @@ export default async function HomePage() {
     getTestimonials(),
     getDoctorPhotoUrl()
   ]);
+  const slotsByService = await getAvailableSlotsByService(services);
 
   const whatsAppUrl = getWhatsAppUrl(
     "Hi Homeo Life, I would like help with treatment questions or appointment booking."
@@ -214,7 +222,7 @@ export default async function HomePage() {
             <h2>Book directly on the Homeo Life website.</h2>
             <p>Patients can choose a service, request a time, and receive confirmation without being sent to another platform.</p>
           </div>
-          <BookingWidget services={services} />
+          <BookingWidget services={services} slotsByService={slotsByService} />
         </section>
 
         <section id="stories" className="section">

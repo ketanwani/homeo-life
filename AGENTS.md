@@ -56,6 +56,33 @@ Storage itself still lives on disk (a Docker volume, same idea as before), just 
 static path again by a future edit. Apply the same pattern to any future runtime-uploaded file (blog
 images, case-story media, etc.) — do not put runtime uploads under `public/`.
 
+## Gotcha: statically-generated pages prerender against seed data, not the real DB, in Docker
+
+Discovered 2026-08-22 while verifying the booking feature. `docker build` runs `next build` in a
+stage with no `DATABASE_URL` (that's only injected via `docker-compose.yml`'s `environment:` at
+*container runtime*, never at build time). So any statically-rendered page that reads from `lib/db.ts`
+gets prerendered using the in-memory seed fallback, not live Postgres data — `/` briefly shows
+`lib/seed.ts`'s fixture availability/services/etc. right after a fresh `docker compose up --build`,
+until ISR revalidates it (see `export const revalidate = 300` in `app/page.tsx`) or a mutation calls
+`revalidatePath("/")`. This isn't a bug exactly (it self-heals within the revalidate window) but it
+will confuse debugging right after a rebuild — if `/` looks like it's showing stale/fixture data
+immediately after `docker compose up --build`, this is why; wait ~5min or trigger a mutation that
+revalidates that path before concluding something's actually broken.
+
+## Gotcha: don't derive a weekday from `new Date(dateStr + "T00:00:00+08:00").getUTCDay()`
+
+Real bug, caught and fixed 2026-08-22 while building slot generation (`lib/booking.ts`). That instant
+is `2026-08-23T16:00:00Z` for the date string `"2026-08-24"` — `.getUTCDay()` reads the *UTC calendar
+day* (the 23rd), silently returning the **previous** day's weekday. Every date's computed weekday was
+off by one, so Monday's slots were generated from Sunday's (closed) availability, Tuesday's from
+Monday's, etc. Caught by writing a standalone reproduction of just the weekday math and comparing
+against known dates — the actual homepage output (repeating Tue/Wed/Sat pattern instead of the real
+Mon–Fri availability) was the tell. Fix: `getWeekday()` in `lib/booking.ts` formats the weekday
+directly from the original `Date` instant via `Intl.DateTimeFormat(..., { timeZone, weekday: "short"
+})` — no reparse-through-UTC step to introduce the shift. Any future date arithmetic in this codebase
+should do the same: format directly from the instant you have, don't round-trip through a date string
+and back.
+
 ## Decision: doctor availability (Calendly can't be the write target)
 
 Checked Calendly's API docs directly (developer.calendly.com + their community forum, staff-confirmed)
@@ -144,10 +171,20 @@ bubbles shown are hardcoded copy, not a live demo), case stories, testimonials, 
 accordion, video/social links section, footer. Reads content through `lib/db.ts`, which reads real
 Postgres rows if `DATABASE_URL` is set, otherwise the seed fixtures.
 
-**Booking widget (`app/ui/booking-widget.tsx`)** — client-side only. Service/date/time selection
-works in the UI; date and time-slot options are **hardcoded arrays**, not real Calendly availability.
-Submit button just flips local `submitted` state — **no request is sent anywhere, nothing is
-persisted, no Calendly event is created.**
+**Booking widget (`app/ui/booking-widget.tsx`) — real, done 2026-08-22.** Native (not Calendly-backed,
+per the availability decision below). `lib/booking.ts` → `getAvailableSlotsByService()` turns
+`doctor_availability` + existing appointments into real bookable slots per service (durations differ,
+so the valid slot set genuinely differs per service — computed once in `app/page.tsx`, passed down as
+a `Record<serviceId, DaySlots[]>` prop, not fetched client-side). 21-day rolling window, 30min step,
+60min minimum lead time, Singapore timezone throughout (fixed +08:00 offset, no DST to worry about).
+Submitting calls `requestAppointment` (`app/actions.ts`, public/no-auth) → `createAppointment()`
+(`lib/db.ts`) which does a real conflict check (looks up each existing appointment's own duration via
+its `service_title`, defaulting 60min if unmatched) inside a transaction before inserting a `patients`
++ `appointments` row. Both `/` and `/doctor` get `revalidatePath`'d on success. Verified end-to-end
+against the dockerized Postgres: exact-slot double-booking rejected, overlapping-but-offset booking
+rejected, adjacent non-overlapping booking accepted, both landing correctly in the doctor's
+Appointments tab. See the two gotchas above (weekday-off-by-one bug found and fixed here; build-time
+seed-data prerendering caught mid-verification) if picking this back up.
 
 **Doctor dashboard (`app/doctor/page.tsx`, `app/ui/doctor-dashboard.tsx`)** — **auth is now real**
 (NextAuth v5 / Auth.js, Credentials provider, JWT sessions). `/doctor/**` is protected by
@@ -245,9 +282,9 @@ platform like Vercel.
 1. ~~Doctor auth~~ — done 2026-08-22 (NextAuth Credentials, see above).
 2. ~~Doctor availability~~ — done 2026-08-22 (fully native, see decision above).
 3. ~~Doctor profile photo~~ — done 2026-08-22 (see above).
-4. Get user sign-off on the WhatsApp handoff approach above (it shapes schema + a chunk of UI).
-5. Wire booking widget → real appointment creation, using `doctor_availability` to generate real
-   bookable slots (minus existing appointments) instead of the current hardcoded date/time arrays.
+4. ~~Real appointment booking~~ — done 2026-08-22 (see above). The Wix-cutover decision above named
+   this as one of the gaps blocking a domain switch — worth re-checking that decision now.
+5. Get user sign-off on the WhatsApp handoff approach above (it shapes schema + a chunk of UI).
 6. WhatsApp Cloud API send + OpenAI-backed AI responder, with the chosen handoff design.
 7. Doctor CMS mutations (blog/case-story/FAQ create-update-publish) + media upload — reuse the
    photo-upload pattern (disk + dynamic route, not `public/`). Now unblocked by auth — these

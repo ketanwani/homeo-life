@@ -108,6 +108,86 @@ export async function getAppointments(): Promise<Appointment[]> {
   }));
 }
 
+export type NewAppointmentInput = {
+  fullName: string;
+  phone: string;
+  email?: string;
+  serviceTitle: string;
+  durationMinutes: number;
+  startsAt: string; // ISO
+  notes?: string;
+};
+
+export class SlotConflictError extends Error {}
+
+export async function createAppointment(input: NewAppointmentInput): Promise<void> {
+  const client = getPool();
+  const startsAt = new Date(input.startsAt);
+  const endsAt = new Date(startsAt.getTime() + input.durationMinutes * 60_000);
+
+  if (!client) {
+    const conflict = appointments.some((existing) => {
+      if (existing.status === "canceled") return false;
+      const otherStart = new Date(existing.startsAt);
+      const otherEnd = new Date(otherStart.getTime() + 60 * 60_000); // fallback mode has no per-appointment duration
+      return startsAt < otherEnd && otherStart < endsAt;
+    });
+    if (conflict) throw new SlotConflictError("Slot already booked");
+
+    appointments.push({
+      id: `local-${appointments.length + 1}`,
+      patientName: input.fullName,
+      serviceTitle: input.serviceTitle,
+      startsAt: startsAt.toISOString(),
+      status: "scheduled",
+      notes: input.notes
+    });
+    return;
+  }
+
+  const pgClient = await client.connect();
+  try {
+    await pgClient.query("begin");
+
+    // Overlap check looks up each *existing* appointment's own duration via its service_title
+    // (defaulting to 60min for anything that doesn't match a known service) -- appointments.
+    // service_title is a denormalized text snapshot, not a foreign key, matching the schema as-is.
+    const conflictResult = await pgClient.query(
+      `select 1
+       from appointments a
+       left join services s on s.title = a.service_title
+       where a.status in ('scheduled', 'rescheduled')
+         and a.starts_at < $2
+         and (a.starts_at + (coalesce(s.duration_minutes, 60) || ' minutes')::interval) > $1
+       limit 1`,
+      [startsAt.toISOString(), endsAt.toISOString()]
+    );
+
+    if ((conflictResult.rowCount ?? 0) > 0) {
+      throw new SlotConflictError("Slot already booked");
+    }
+
+    const patientResult = await pgClient.query(
+      `insert into patients (full_name, email, phone) values ($1, $2, $3) returning id`,
+      [input.fullName, input.email ?? null, input.phone]
+    );
+    const patientId = patientResult.rows[0].id;
+
+    await pgClient.query(
+      `insert into appointments (patient_id, service_title, starts_at, status, notes)
+       values ($1, $2, $3, 'scheduled', $4)`,
+      [patientId, input.serviceTitle, startsAt.toISOString(), input.notes ?? null]
+    );
+
+    await pgClient.query("commit");
+  } catch (error) {
+    await pgClient.query("rollback").catch(() => {});
+    throw error;
+  } finally {
+    pgClient.release();
+  }
+}
+
 export async function getAvailability(): Promise<DayAvailability[]> {
   const client = getPool();
   if (!client) return availability;
