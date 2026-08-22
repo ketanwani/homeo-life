@@ -12,8 +12,9 @@ import {
   Save,
   UploadCloud
 } from "lucide-react";
-import { saveAvailability, uploadDoctorPhoto } from "@/app/doctor/actions";
+import { saveAvailability } from "@/app/doctor/actions";
 import type { Appointment, DayAvailability } from "@/lib/types";
+import { DoctorPhotoUploader } from "./doctor-photo-uploader";
 
 type Panel = "calendar" | "appointments" | "editor" | "faq" | "profile";
 
@@ -58,30 +59,6 @@ function AvailabilityEditor({ availability }: { availability: DayAvailability[] 
         <Save size={16} /> {isPending ? "Saving..." : "Save availability"}
       </button>
     </form>
-  );
-}
-
-function DoctorPhotoUploader({ photoUrl }: { photoUrl: string }) {
-  const [state, formAction, isPending] = useActionState(uploadDoctorPhoto, { ok: false });
-
-  return (
-    <div className="profilePhotoPanel">
-      {/* eslint-disable-next-line @next/next/no-img-element -- admin-only thumbnail, not worth Next/Image's optimizer overhead */}
-      <img className="profilePhotoPreview" src={photoUrl} alt="Current doctor profile photo" />
-      <form action={formAction} encType="multipart/form-data" className="profilePhotoForm">
-        <label className="uploadBox">
-          <ImagePlus size={22} />
-          Choose a new photo (JPEG, PNG, or WebP, up to 5MB)
-          <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required />
-        </label>
-        {state.message ? (
-          <p className={state.ok ? "availabilitySuccess" : "authError"}>{state.message}</p>
-        ) : null}
-        <button className="button compact" type="submit" disabled={isPending}>
-          <UploadCloud size={16} /> {isPending ? "Uploading..." : "Upload photo"}
-        </button>
-      </form>
-    </div>
   );
 }
 

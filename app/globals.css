@@ -1056,6 +1056,65 @@ textarea {
   align-content: start;
 }
 
+.cropperPanel {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.cropperFrame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--mint);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.cropperFrame:active {
+  cursor: grabbing;
+}
+
+.cropperFrame img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  pointer-events: none;
+}
+
+.cropperZoom {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.cropperZoom input[type="range"] {
+  flex: 1;
+  width: auto;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.cropperHint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.cropperActions {
+  display: flex;
+  gap: 10px;
+}
+
 .roadmapGrid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
