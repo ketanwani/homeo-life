@@ -3,19 +3,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://homeolife:homeolife@postgres:5432/homeolife
-      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      DATABASE_URL: postgres://homeolife:${POSTGRES_PASSWORD:-homeolife}@postgres:5432/homeolife
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
       NEXT_PUBLIC_WHATSAPP_NUMBER: 6593571688
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       # Local/dev default so `docker compose up` works with zero setup. Override with your own
-      # (generate via `npx auth secret`) for anything beyond local dev.
+      # (generate via `npx auth secret`) for anything beyond local dev -- see .env.production.example.
       AUTH_SECRET: ${AUTH_SECRET:-UXLIxxqZ3TtXl500hfr68UegCm/sGncQpEzAV3iaEhQ=}
     ports:
-      - "3000:3000"
+      # Host-only on purpose: the app should never be reached directly from the internet in
+      # production, only through the caddy service in docker-compose.prod.yml (port 80/443). This
+      # also applies locally -- still reachable at localhost:3000, just not from other machines.
+      - "127.0.0.1:3000:3000"
     volumes:
       - doctor-uploads:/app/uploads
     depends_on:
@@ -24,12 +28,13 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: homeolife
-      POSTGRES_PASSWORD: homeolife
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-homeolife}
       POSTGRES_DB: homeolife
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro

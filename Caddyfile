@@ -1,0 +1,3 @@
+myhomeolife.com, www.myhomeolife.com {
+	reverse_proxy app:3000
+}

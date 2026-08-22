@@ -268,14 +268,35 @@ on first container boot only — no re-run/versioning story yet). No seed script
 
 ## Decision: deployment / Wix cutover timing
 
-Decided 2026-08-22: the live site (myhomeolife.com, currently on Wix) stays on Wix for now. Do NOT
-suggest or plan a domain cutover until the core gaps below are closed — the site would otherwise
-replace Wix's working booking/contact flow with fake ones (booking widget doesn't persist, no real
-WhatsApp AI, no Calendly). Revisit deployment once real appointment creation (next item) and ideally
-the WhatsApp AI piece are done. When that conversation happens: this project is built for a VPS +
-Docker Compose deployment (Caddy/nginx for HTTPS), not serverless — the photo upload feature
-specifically depends on persistent local disk (a Docker volume) and would need rework (e.g. S3) on a
-platform like Vercel.
+Decided 2026-08-22 (initial): stay on Wix until real appointment booking exists — done same day, see
+above. Decided again 2026-08-22 (later that day): user has a DigitalOcean droplet and wants to deploy
+now, WhatsApp AI and doctor CMS mutations still not done. That's the user's call, not something to
+push back on further — proceeded with deployment setup. Still worth knowing: WhatsApp AI is not real
+yet (no OpenAI calls, no WhatsApp send capability) and the doctor's Content/FAQ tabs don't save.
+
+**Deployment setup done 2026-08-22:**
+- Code pushed to a private GitHub repo: `github.com/ketanwani/homeo-life` (`git remote -v` to
+  confirm). User will run droplet commands themselves via their own SSH session, not something done
+  from this environment.
+- `docker-compose.yml` — Postgres and the app's port 3000 now bind to `127.0.0.1` only (were `0.0.0.0`
+  before, i.e. directly internet-reachable — fine for a throwaway local dev box, wrong for a real
+  server). `POSTGRES_PASSWORD` and `NEXT_PUBLIC_SITE_URL` are now env-var-driven
+  (`${VAR:-default}`) instead of hardcoded, defaults preserved so local dev is unaffected.
+- `docker-compose.prod.yml` (new) — adds a `caddy` service (automatic Let's Encrypt HTTPS,
+  reverse-proxies to `app:3000`). Used via
+  `docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d`, not standalone.
+- `Caddyfile` (new) — currently hardcodes `myhomeolife.com, www.myhomeolife.com`; update if the
+  domain differs.
+- `.env.production.example` (new) — template for the droplet's `.env` (`POSTGRES_PASSWORD`,
+  `AUTH_SECRET`, `NEXT_PUBLIC_SITE_URL`). Distinct from `.env.example`, which is for local
+  (non-Docker) dev — don't merge these, they serve different setups.
+- `README.md` — has the full droplet runbook (install Docker, deploy key for the private repo, bring
+  the stack up, verify pre-DNS-cutover with a `Host:` header, switch DNS, redeploy-on-update flow).
+  DNS: an A record at Wix (Wix can keep managing DNS, doesn't require moving the domain away from
+  Wix) pointed at the droplet's IP.
+- This project deliberately targets VPS + Docker Compose, not serverless — the photo upload feature
+  specifically depends on persistent local disk (a Docker volume) and would need rework (e.g. S3) on
+  a platform like Vercel. Don't suggest Vercel/serverless without flagging that tradeoff.
 
 ## Next steps (suggested order — confirm with user before starting a big one)
 
