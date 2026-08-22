@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-labelledby="title desc">
+  <title id="title">Homeo Life logo</title>
+  <desc id="desc">A green rounded mark with a healing leaf and Homeo Life wordmark.</desc>
+  <rect width="320" height="96" rx="24" fill="#f8f7f2"/>
+  <rect x="16" y="16" width="64" height="64" rx="18" fill="#174a3f"/>
+  <path d="M34 54c11-2.5 20-10.2 25.5-23 8.3 13.8 3.8 31-9.8 36.4C40.7 71 32.5 66.6 34 54Z" fill="#dff0e8"/>
+  <path d="M38 56c7.7-2.1 13.6-6.5 18.3-13.6" fill="none" stroke="#1f6b57" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M32 31v34M64 31v34M32 48h32" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+  <text x="98" y="45" fill="#1c2a24" font-family="Inter, Arial, sans-serif" font-size="29" font-weight="800">Homeo Life</text>
+  <text x="100" y="68" fill="#65736d" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="600">Dr. Neha Mehta</text>
+</svg>
