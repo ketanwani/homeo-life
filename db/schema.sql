@@ -59,6 +59,17 @@ create table if not exists testimonials (
   created_at timestamptz not null default now()
 );
 
+-- weekday: 0 = Sunday .. 6 = Saturday (JS Date#getDay() convention, used when generating slots).
+create table if not exists doctor_availability (
+  id uuid primary key default gen_random_uuid(),
+  weekday smallint not null unique check (weekday between 0 and 6),
+  is_available boolean not null default false,
+  start_time time,
+  end_time time,
+  updated_at timestamptz not null default now(),
+  check (not is_available or (start_time is not null and end_time is not null and start_time < end_time))
+);
+
 create table if not exists doctors (
   id uuid primary key default gen_random_uuid(),
   email text not null unique,

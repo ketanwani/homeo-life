@@ -1,6 +1,6 @@
 import { Pool } from "pg";
-import { appointments, contentPosts, services, testimonials } from "./seed";
-import type { Appointment, ContentPost, Doctor, Service, Testimonial } from "./types";
+import { appointments, availability, contentPosts, services, testimonials } from "./seed";
+import type { Appointment, ContentPost, DayAvailability, Doctor, Service, Testimonial } from "./types";
 
 let pool: Pool | null = null;
 
@@ -106,6 +106,42 @@ export async function getAppointments(): Promise<Appointment[]> {
     status: row.status,
     notes: row.notes ?? undefined
   }));
+}
+
+export async function getAvailability(): Promise<DayAvailability[]> {
+  const client = getPool();
+  if (!client) return availability;
+
+  const result = await client.query(
+    `select weekday, is_available, start_time, end_time from doctor_availability order by weekday asc`
+  );
+
+  return result.rows.map((row) => ({
+    weekday: row.weekday,
+    isAvailable: row.is_available,
+    startTime: row.start_time ? String(row.start_time).slice(0, 5) : undefined,
+    endTime: row.end_time ? String(row.end_time).slice(0, 5) : undefined
+  }));
+}
+
+export async function setAvailability(days: DayAvailability[]): Promise<void> {
+  const client = getPool();
+  if (!client) {
+    for (const day of days) {
+      const index = availability.findIndex((existing) => existing.weekday === day.weekday);
+      if (index !== -1) availability[index] = day;
+    }
+    return;
+  }
+
+  for (const day of days) {
+    await client.query(
+      `update doctor_availability
+       set is_available = $2, start_time = $3, end_time = $4, updated_at = now()
+       where weekday = $1`,
+      [day.weekday, day.isAvailable, day.isAvailable ? day.startTime : null, day.isAvailable ? day.endTime : null]
+    );
+  }
 }
 
 // There is only ever one doctor account today, so when DATABASE_URL isn't set (local dev without

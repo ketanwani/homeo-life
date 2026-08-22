@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import {
   CalendarDays,
   ClipboardList,
@@ -8,15 +8,65 @@ import {
   ImagePlus,
   MessageSquareText,
   PenLine,
-  RefreshCw,
   Save,
   UploadCloud
 } from "lucide-react";
-import type { Appointment } from "@/lib/types";
+import { saveAvailability } from "@/app/doctor/actions";
+import type { Appointment, DayAvailability } from "@/lib/types";
 
 type Panel = "calendar" | "appointments" | "editor" | "faq";
 
-export function DashboardTabs({ appointments }: { appointments: Appointment[] }) {
+const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function AvailabilityEditor({ availability }: { availability: DayAvailability[] }) {
+  const [state, formAction, isPending] = useActionState(saveAvailability, { ok: false });
+
+  const days = useMemo(() => {
+    const byWeekday = new Map(availability.map((day) => [day.weekday, day]));
+    return WEEKDAY_LABELS.map((label, weekday) => {
+      const day = byWeekday.get(weekday);
+      return {
+        weekday,
+        label,
+        isAvailable: day?.isAvailable ?? false,
+        startTime: day?.startTime ?? "09:00",
+        endTime: day?.endTime ?? "17:00"
+      };
+    });
+  }, [availability]);
+
+  return (
+    <form action={formAction}>
+      <div className="availabilityGrid">
+        {days.map((day) => (
+          <div className="availabilityRow" key={day.weekday}>
+            <label className="availabilityDayToggle">
+              <input type="checkbox" name={`available-${day.weekday}`} defaultChecked={day.isAvailable} />
+              {day.label}
+            </label>
+            <input type="time" name={`start-${day.weekday}`} defaultValue={day.startTime} aria-label={`${day.label} start time`} />
+            <span>to</span>
+            <input type="time" name={`end-${day.weekday}`} defaultValue={day.endTime} aria-label={`${day.label} end time`} />
+          </div>
+        ))}
+      </div>
+      {state.message ? (
+        <p className={state.ok ? "availabilitySuccess" : "authError"}>{state.message}</p>
+      ) : null}
+      <button className="button compact availabilitySave" type="submit" disabled={isPending}>
+        <Save size={16} /> {isPending ? "Saving..." : "Save availability"}
+      </button>
+    </form>
+  );
+}
+
+export function DashboardTabs({
+  appointments,
+  availability
+}: {
+  appointments: Appointment[];
+  availability: DayAvailability[];
+}) {
   const [active, setActive] = useState<Panel>("calendar");
   const nextAppointment = useMemo(() => appointments.find((item) => item.status !== "canceled"), [appointments]);
 
@@ -45,13 +95,8 @@ export function DashboardTabs({ appointments }: { appointments: Appointment[] })
                 <h3>Consultation availability</h3>
                 <p>{nextAppointment ? `Next appointment: ${nextAppointment.patientName}` : "No upcoming appointments"}</p>
               </div>
-              <button className="button compact"><RefreshCw size={16} /> Sync</button>
             </div>
-            <div className="availabilityGrid">
-              <label>Monday<input type="text" defaultValue="10:00 - 14:00" /></label>
-              <label>Tuesday<input type="text" defaultValue="16:00 - 20:00" /></label>
-              <label>Friday<input type="text" defaultValue="11:00 - 15:00" /></label>
-            </div>
+            <AvailabilityEditor availability={availability} />
           </section>
         ) : null}
 
@@ -122,6 +167,12 @@ export function DashboardTabs({ appointments }: { appointments: Appointment[] })
   );
 }
 
-export function DoctorDashboard({ appointments }: { appointments: Appointment[] }) {
-  return <DashboardTabs appointments={appointments} />;
+export function DoctorDashboard({
+  appointments,
+  availability
+}: {
+  appointments: Appointment[];
+  availability: DayAvailability[];
+}) {
+  return <DashboardTabs appointments={appointments} availability={availability} />;
 }

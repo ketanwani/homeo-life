@@ -45,3 +45,10 @@ export type Doctor = {
   fullName: string;
   passwordHash: string;
 };
+
+export type DayAvailability = {
+  weekday: number; // 0 = Sunday .. 6 = Saturday
+  isAvailable: boolean;
+  startTime?: string; // "HH:MM"
+  endTime?: string; // "HH:MM"
+};

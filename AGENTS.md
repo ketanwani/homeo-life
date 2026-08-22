@@ -37,6 +37,37 @@ any session so the next tool/session (or the next person) picks up with full con
 > delegation done so the doctor can keep chatting with the patient but from their own, different
 > WhatsApp Business account? If not possible, what's the alternative?
 
+## Decision: doctor availability (Calendly can't be the write target)
+
+Checked Calendly's API docs directly (developer.calendly.com + their community forum, staff-confirmed)
+before building anything: **Calendly's API is read-only for availability.** There is no endpoint —
+not in the classic API, not in the newer "Scheduling API" — to create or update a user's working
+hours. You can only read whatever a user configured inside Calendly's own UI. So "doctor sets hours
+in our app → push to Calendly via API" is not buildable; "doctor sets hours in Calendly → we read it"
+is the only Calendly-integrated option that actually works.
+
+Decided 2026-08-22: go **fully native**. Doctor availability lives entirely in our own
+`doctor_availability` Postgres table; Calendly is not involved in availability at all. Implemented:
+- `db/schema.sql` — `doctor_availability` table, one row per weekday (0=Sunday..6=Saturday, JS
+  `Date#getDay()` convention), `is_available` + `start_time`/`end_time`, with a check constraint that
+  an available day must have both times set and start < end.
+- `lib/db.ts` — `getAvailability()` / `setAvailability()`, same Postgres-or-in-memory-fallback
+  pattern as the rest of the file (`lib/seed.ts` now exports a mutable `availability` array for the
+  no-DB case).
+- `app/doctor/actions.ts` — `saveAvailability` server action (checks `auth()` itself, not just
+  relying on middleware, since server actions are independently callable). Validates each open day
+  has start < end before writing.
+- `app/ui/doctor-dashboard.tsx` — the Calendar tab is now a real form: all 7 days, a checkbox to open
+  a day plus start/end `<input type="time">`, wired via `useActionState`. The old "Sync" button is
+  gone — there is nothing to sync to anymore.
+- Verified end-to-end against the dockerized Postgres: wrote a change directly through the same code
+  path `setAvailability()` uses, confirmed it persisted, confirmed the page re-fetched and rendered
+  the new checked-state and times correctly, then restored the original defaults.
+
+This still leaves the booking widget (`app/ui/booking-widget.tsx`) showing **hardcoded** date/time
+options unrelated to this table — turning `doctor_availability` into actual bookable slots (minus
+existing appointments) is the natural next step and is *not done yet*.
+
 ## Decision: WhatsApp AI → doctor handoff
 
 Answered but **not yet implemented**. WhatsApp Cloud API ties a conversation thread to one business
@@ -139,8 +170,10 @@ on first container boot only — no re-run/versioning story yet). No seed script
 `lib/seed.ts` data into real Postgres (so a fresh DB has empty tables until someone inserts rows).
 
 **Not started:**
-- Any real Calendly API calls (create/list/reschedule event types, availability) — only the inbound
-  webhook receiver stub exists.
+- Any real Calendly API calls — moot for availability now (see decision above: Calendly's API can't
+  write availability, so we went fully native). Calendly's inbound webhook receiver stub still exists
+  and is unrelated to this decision; whether Calendly has any role left in this project (e.g. nothing)
+  is an open question.
 - Any real WhatsApp Cloud API calls (sending messages) — `WHATSAPP_ACCESS_TOKEN` /
   `WHATSAPP_PHONE_NUMBER_ID` env vars exist but are unused in code.
 - AI integration — `OPENAI_API_KEY` env var exists but is unused in code; no model calls anywhere.
@@ -165,11 +198,10 @@ on first container boot only — no re-run/versioning story yet). No seed script
 ## Next steps (suggested order — confirm with user before starting a big one)
 
 1. ~~Doctor auth~~ — done 2026-08-22 (NextAuth Credentials, see above).
-2. Get user sign-off on the WhatsApp handoff approach above (it shapes schema + a chunk of UI).
-3. Wire booking widget → real appointment creation (Postgres insert; Calendly integration or a
-   native slot system — need to decide which).
-4. Calendly API integration (availability, create/reschedule) — or decide to go fully native instead
-   of Calendly, per the booking-widget UI already built.
+2. ~~Doctor availability~~ — done 2026-08-22 (fully native, see decision above).
+3. Get user sign-off on the WhatsApp handoff approach above (it shapes schema + a chunk of UI).
+4. Wire booking widget → real appointment creation, using `doctor_availability` to generate real
+   bookable slots (minus existing appointments) instead of the current hardcoded date/time arrays.
 5. WhatsApp Cloud API send + OpenAI-backed AI responder, with the chosen handoff design.
 6. Doctor CMS mutations (blog/case-story/FAQ create-update-publish) + media upload. Now unblocked by
    auth — these routes/actions should require a session (see `middleware.ts` matcher — extend it to

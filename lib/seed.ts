@@ -1,4 +1,4 @@
-import type { Appointment, ContentPost, Service, Testimonial } from "./types";
+import type { Appointment, ContentPost, DayAvailability, Service, Testimonial } from "./types";
 
 export const services: Service[] = [
   {
@@ -149,6 +149,19 @@ export const testimonials: Testimonial[] = [
     rating: 5,
     quote: "The process felt structured and calm. We appreciated the regular check-ins and practical guidance."
   }
+];
+
+// `let`, not `const` -- this is the in-memory fallback used when DATABASE_URL is unset, and
+// setAvailability() in lib/db.ts mutates it in place so saves persist for the life of the dev
+// server process (there's no real storage to write to without a database).
+export let availability: DayAvailability[] = [
+  { weekday: 0, isAvailable: false },
+  { weekday: 1, isAvailable: true, startTime: "10:00", endTime: "14:00" },
+  { weekday: 2, isAvailable: true, startTime: "16:00", endTime: "20:00" },
+  { weekday: 3, isAvailable: false },
+  { weekday: 4, isAvailable: false },
+  { weekday: 5, isAvailable: true, startTime: "11:00", endTime: "15:00" },
+  { weekday: 6, isAvailable: false }
 ];
 
 export const appointments: Appointment[] = [

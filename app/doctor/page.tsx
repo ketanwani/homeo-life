@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, LogOut, UserRound } from "lucide-react";
 import { auth, signOut } from "@/auth";
-import { getAppointments } from "@/lib/db";
+import { getAppointments, getAvailability } from "@/lib/db";
 import { DoctorDashboard } from "../ui/doctor-dashboard";
 import { HomeoLifeLogo } from "../ui/logo";
 
@@ -12,7 +12,7 @@ export default async function DoctorPage() {
     redirect("/login");
   }
 
-  const appointments = await getAppointments();
+  const [appointments, availability] = await Promise.all([getAppointments(), getAvailability()]);
 
   return (
     <main className="doctorPage">
@@ -38,11 +38,11 @@ export default async function DoctorPage() {
           <p className="eyebrow">Doctor workspace</p>
           <h1>Manage calendar, content, FAQs, and patient appointments.</h1>
           <p>
-            This is the logged-in product surface. Add NextAuth or Clerk, then connect the forms to
-            PostgreSQL mutations and the private scheduling provider.
+            Availability is now live and saved to Postgres. Appointments, content, and FAQ tabs are
+            still UI-only and not yet wired to the database.
           </p>
         </div>
-        <DoctorDashboard appointments={appointments} />
+        <DoctorDashboard appointments={appointments} availability={availability} />
       </section>
     </main>
   );

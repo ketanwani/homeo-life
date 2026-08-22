@@ -89,6 +89,16 @@ insert into testimonials (patient_name, condition_label, rating, quote) values
   ('A patient in Singapore', 'Skin care', 5, 'Dr. Neha listened carefully and looked at the full picture instead of only the visible symptoms.'),
   ('Parent of a child patient', 'Children''s care', 5, 'The process felt structured and calm. We appreciated the regular check-ins and practical guidance.');
 
+insert into doctor_availability (weekday, is_available, start_time, end_time) values
+  (0, false, null, null),
+  (1, true, '10:00', '14:00'),
+  (2, true, '16:00', '20:00'),
+  (3, false, null, null),
+  (4, false, null, null),
+  (5, true, '11:00', '15:00'),
+  (6, false, null, null)
+on conflict (weekday) do nothing;
+
 with seeded_patients as (
   insert into patients (full_name) values
     ('Priya S.'),
