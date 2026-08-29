@@ -80,8 +80,8 @@ export default async function HomePage() {
               <p className="eyebrow">Homeopathic care in Singapore</p>
               <h1>Personal care for long-term healing.</h1>
               <p>
-                Detailed homeopathic consultations with Dr. Neha Mehta, supported by private online
-                booking, patient education, and guided follow-up.
+                Detailed Homeopathic consultations with Dr. Neha Mehta, available in-person at the
+                clinic or online, supported by private booking, patient education, and guided follow-up.
               </p>
               <div className="heroActions">
                 <Link className="button primary" href="#book">
@@ -94,8 +94,8 @@ export default async function HomePage() {
                 </a>
               </div>
               <div className="trustRow" aria-label="Practice highlights">
-                <span><strong>17+</strong> years</span>
-                <span><strong>Online</strong> consults</span>
+                <span><strong>15+</strong> years</span>
+                <span><strong>In-person &amp; online</strong> consults</span>
                 <span><strong>AI</strong> support</span>
               </div>
             </div>
@@ -110,7 +110,7 @@ export default async function HomePage() {
                 </div>
                 <div>
                   <span>Visit type</span>
-                  <strong>Online or follow-up</strong>
+                  <strong>In-person or online</strong>
                 </div>
               </div>
               <Link className="button primary full" href="#book">
@@ -132,7 +132,7 @@ export default async function HomePage() {
             <div className="careMetrics">
               <div><strong>Private</strong><span>patient communication</span></div>
               <div><strong>Structured</strong><span>case follow-up</span></div>
-              <div><strong>Guided</strong><span>online care</span></div>
+              <div><strong>Guided</strong><span>in-person &amp; online care</span></div>
             </div>
             <div className="credentialGrid">
               <div><GraduationCap /><span>B.H.M.S, MD (London)</span></div>

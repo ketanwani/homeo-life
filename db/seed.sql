@@ -5,7 +5,7 @@
 
 insert into services (title, description, duration_minutes, price_cents, currency, is_featured) values
   ('Pre Consultation', 'A focused discovery call to understand concerns and recommend the right consultation path.', 15, 500, 'SGD', true),
-  ('Online Consultation & Medicines', 'Complete virtual consultation with treatment planning, medicine guidance, and follow-up notes.', 45, 7000, 'SGD', true),
+  ('Consultation & Medicines', 'Complete consultation, in-person at the clinic or online, with treatment planning, medicine guidance, and follow-up notes.', 45, 7000, 'SGD', true),
   ('Migraine Care', 'Constitutional assessment for recurring migraines, triggers, sleep patterns, and stress load.', 60, 9000, 'SGD', false),
   ('Skin & Psoriasis', 'Long-term support for acne, psoriasis, recurring eruptions, and flare-up management.', 60, 12000, 'SGD', false),
   ('Children''s Behavioural Care', 'Gentle support for focus, sleep, emotional regulation, and behavioural concerns in children.', 60, 12000, 'SGD', false),
@@ -110,7 +110,7 @@ insert into appointments (patient_id, service_title, starts_at, status, notes)
 select id, service_title, starts_at::timestamptz, status::appointment_status, notes
 from seeded_patients
 join (values
-  ('Priya S.', 'Online Consultation & Medicines', '2026-08-24T10:30:00+08:00', 'scheduled', 'First consult, migraine history.'),
+  ('Priya S.', 'Consultation & Medicines', '2026-08-24T10:30:00+08:00', 'scheduled', 'First consult, migraine history.'),
   ('Rahul M.', 'Skin & Psoriasis', '2026-08-25T18:00:00+08:00', 'rescheduled', 'Uploaded photos before appointment.'),
   ('Ananya K.', 'Children''s Behavioural Care', '2026-08-26T16:30:00+08:00', 'scheduled', 'Parent requested evening follow-up.')
 ) as seed_appointments (patient_name, service_title, starts_at, status, notes)

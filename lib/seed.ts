@@ -12,8 +12,8 @@ export const services: Service[] = [
   },
   {
     id: "online-consult",
-    title: "Online Consultation & Medicines",
-    description: "Complete virtual consultation with treatment planning, medicine guidance, and follow-up notes.",
+    title: "Consultation & Medicines",
+    description: "Complete consultation, in-person at the clinic or online, with treatment planning, medicine guidance, and follow-up notes.",
     durationMinutes: 45,
     priceCents: 7000,
     currency: "SGD",
@@ -168,7 +168,7 @@ export const appointments: Appointment[] = [
   {
     id: "a-1",
     patientName: "Priya S.",
-    serviceTitle: "Online Consultation & Medicines",
+    serviceTitle: "Consultation & Medicines",
     startsAt: "2026-08-24T10:30:00+08:00",
     status: "scheduled",
     notes: "First consult, migraine history."
