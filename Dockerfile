@@ -23,6 +23,10 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# scripts/create-doctor.mjs and scripts/hash-password.mjs are run via `docker compose exec app` per
+# the README's droplet runbook -- .next/standalone only contains what Next traced from app routes,
+# which never includes this directory since it's not part of the app itself.
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
 # Doctor photo uploads land here (see docker-compose.yml, which mounts a volume over this path so
 # uploads survive image rebuilds; served via app/api/doctor-photo, not as a static public/ file --
