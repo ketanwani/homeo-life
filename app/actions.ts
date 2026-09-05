@@ -1,8 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
-import { createAppointment, getServices, SlotConflictError } from "@/lib/db";
+import { createAppointment, getServices, setAppointmentStripeSession, SlotConflictError } from "@/lib/db";
+import { getSiteUrl } from "@/lib/site";
+import { getStripe } from "@/lib/stripe";
 
 export type RequestAppointmentState = {
   ok: boolean;
@@ -39,8 +42,9 @@ export async function requestAppointment(
     return { ok: false, message: "That slot is no longer available. Pick another time." };
   }
 
+  let appointmentId: string;
   try {
-    await createAppointment({
+    appointmentId = await createAppointment({
       fullName: parsed.data.fullName,
       phone: parsed.data.phone,
       email: parsed.data.email || undefined,
@@ -59,8 +63,40 @@ export async function requestAppointment(
   revalidatePath("/");
   revalidatePath("/doctor");
 
-  return {
-    ok: true,
-    message: "Your appointment request is in. We'll confirm the details by WhatsApp or email shortly."
-  };
+  // The appointment row above already reserves the slot (status: scheduled, payment_status:
+  // pending) -- if Stripe is unreachable here, the booking still exists for the doctor to see and
+  // follow up on manually, it just won't have moved to "paid" automatically.
+  const siteUrl = getSiteUrl();
+  let checkoutUrl: string;
+  try {
+    const session = await getStripe().checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: service.currency.toLowerCase(),
+            product_data: { name: service.title },
+            unit_amount: service.priceCents
+          },
+          quantity: 1
+        }
+      ],
+      client_reference_id: appointmentId,
+      metadata: { appointmentId },
+      success_url: `${siteUrl}/booking/success?appointment=${appointmentId}`,
+      cancel_url: `${siteUrl}/booking/cancelled?appointment=${appointmentId}`
+    });
+    if (!session.url) throw new Error("Stripe did not return a checkout URL");
+    await setAppointmentStripeSession(appointmentId, session.id);
+    checkoutUrl = session.url;
+  } catch (error) {
+    console.error("Failed to create Stripe checkout session", error);
+    return {
+      ok: false,
+      message:
+        "Your slot is reserved, but we couldn't start payment just now. Please message us on WhatsApp to complete payment and confirm your booking."
+    };
+  }
+
+  redirect(checkoutUrl);
 }

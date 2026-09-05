@@ -31,6 +31,8 @@ create table if not exists appointments (
   starts_at timestamptz not null,
   status appointment_status not null default 'scheduled',
   notes text,
+  payment_status text not null default 'pending' check (payment_status in ('pending', 'paid', 'failed')),
+  stripe_checkout_session_id text unique,
   created_at timestamptz not null default now()
 );
 

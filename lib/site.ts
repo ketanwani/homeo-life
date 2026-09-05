@@ -14,3 +14,7 @@ export function getWhatsAppUrl(message: string) {
   const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "6593571688";
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
+
+export function getSiteUrl() {
+  return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+}

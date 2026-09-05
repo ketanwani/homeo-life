@@ -12,6 +12,8 @@ services:
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       # Local/dev default so `docker compose up` works with zero setup. Override with your own
       # (generate via `npx auth secret`) for anything beyond local dev -- see .env.production.example.
       AUTH_SECRET: ${AUTH_SECRET:-UXLIxxqZ3TtXl500hfr68UegCm/sGncQpEzAV3iaEhQ=}
