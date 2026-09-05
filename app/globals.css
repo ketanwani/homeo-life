@@ -505,6 +505,19 @@ p {
   margin-bottom: 18px;
 }
 
+.serviceImageWrap {
+  margin: -24px -24px 18px;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+}
+
+.serviceImage {
+  display: block;
+  width: 100%;
+  aspect-ratio: 12 / 5;
+  object-fit: cover;
+}
+
 .serviceMeta {
   justify-content: space-between;
   margin: 24px 0;
@@ -1034,6 +1047,73 @@ textarea {
   display: none;
 }
 
+.serviceManager {
+  display: grid;
+  gap: 20px;
+}
+
+.serviceFormRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.serviceManagerList {
+  display: grid;
+  gap: 14px;
+}
+
+.serviceManagerCard {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.serviceManagerThumb {
+  width: 88px;
+  height: 66px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.serviceManagerInfo {
+  display: grid;
+  gap: 4px;
+}
+
+.serviceManagerInfo span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.serviceManagerInfo p {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.serviceManagerActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deleteConfirm {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.deleteConfirm span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: right;
+}
+
 .profilePhotoPanel {
   display: grid;
   grid-template-columns: 140px 1fr;
@@ -1113,6 +1193,19 @@ textarea {
 .cropperActions {
   display: flex;
   gap: 10px;
+}
+
+.imageCropperIdle {
+  display: grid;
+  gap: 10px;
+}
+
+.imageCropperPreview {
+  width: 100%;
+  max-width: 320px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  object-fit: cover;
 }
 
 .roadmapGrid {

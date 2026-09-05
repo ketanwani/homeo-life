@@ -4,8 +4,8 @@ import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
-import { setAvailability } from "@/lib/db";
-import { UPLOADS_DIR } from "@/lib/doctor-photo";
+import { createService, deleteService, setAvailability, updateService } from "@/lib/db";
+import { UPLOADS_DIR } from "@/lib/uploads";
 import type { DayAvailability } from "@/lib/types";
 
 export type SaveAvailabilityState = {
@@ -55,13 +55,13 @@ export type UploadPhotoState = {
   message?: string;
 };
 
-const PHOTO_EXTENSION_BY_MIME_TYPE: Record<string, string> = {
+const IMAGE_EXTENSION_BY_MIME_TYPE: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp"
 };
 
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export async function uploadDoctorPhoto(
   _prevState: UploadPhotoState,
@@ -77,12 +77,12 @@ export async function uploadDoctorPhoto(
     return { ok: false, message: "Choose an image file first." };
   }
 
-  const extension = PHOTO_EXTENSION_BY_MIME_TYPE[file.type];
+  const extension = IMAGE_EXTENSION_BY_MIME_TYPE[file.type];
   if (!extension) {
     return { ok: false, message: "Use a JPEG, PNG, or WebP image." };
   }
 
-  if (file.size > MAX_PHOTO_BYTES) {
+  if (file.size > MAX_IMAGE_BYTES) {
     return { ok: false, message: "Image must be 5MB or smaller." };
   }
 
@@ -102,4 +102,113 @@ export async function uploadDoctorPhoto(
   revalidatePath("/doctor");
 
   return { ok: true, message: "Photo updated." };
+}
+
+export type SaveServiceState = {
+  ok: boolean;
+  message?: string;
+};
+
+export async function saveService(_prevState: SaveServiceState, formData: FormData): Promise<SaveServiceState> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "You need to be signed in to do that." };
+  }
+
+  const id = formData.get("id");
+  const title = formData.get("title");
+  const description = formData.get("description");
+  const durationMinutes = Number(formData.get("durationMinutes"));
+  const price = Number(formData.get("price"));
+  const currency = formData.get("currency");
+  const isFeatured = formData.get("isFeatured") === "on";
+  const image = formData.get("image");
+
+  if (typeof title !== "string" || !title.trim()) {
+    return { ok: false, message: "Give the treatment a name." };
+  }
+  if (typeof description !== "string" || !description.trim()) {
+    return { ok: false, message: "Add a short description." };
+  }
+  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+    return { ok: false, message: "Duration must be a positive number of minutes." };
+  }
+  if (!Number.isFinite(price) || price <= 0) {
+    return { ok: false, message: "Price must be a positive amount." };
+  }
+
+  const input = {
+    title: title.trim(),
+    description: description.trim(),
+    durationMinutes: Math.round(durationMinutes),
+    priceCents: Math.round(price * 100),
+    currency: typeof currency === "string" && currency.trim() ? currency.trim().toUpperCase() : "SGD",
+    isFeatured
+  };
+
+  const isEditing = typeof id === "string" && id.length > 0;
+  const serviceId = isEditing ? id : await createService(input);
+  if (isEditing) {
+    await updateService(id, input);
+  }
+
+  if (image instanceof File && image.size > 0) {
+    const extension = IMAGE_EXTENSION_BY_MIME_TYPE[image.type];
+    if (!extension) {
+      return { ok: false, message: "Treatment saved, but the image must be a JPEG, PNG, or WebP." };
+    }
+    if (image.size > MAX_IMAGE_BYTES) {
+      return { ok: false, message: "Treatment saved, but the image must be 5MB or smaller." };
+    }
+
+    await mkdir(UPLOADS_DIR, { recursive: true });
+    const existingFiles = await readdir(UPLOADS_DIR).catch(() => []);
+    await Promise.all(
+      existingFiles
+        .filter((name) => name.startsWith(`service-${serviceId}.`))
+        .map((name) => unlink(path.join(UPLOADS_DIR, name)).catch(() => {}))
+    );
+
+    const buffer = Buffer.from(await image.arrayBuffer());
+    await writeFile(path.join(UPLOADS_DIR, `service-${serviceId}.${extension}`), buffer);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/doctor");
+
+  return { ok: true, message: isEditing ? "Treatment updated." : "Treatment added." };
+}
+
+export type DeleteServiceState = {
+  ok: boolean;
+  message?: string;
+};
+
+export async function deleteServiceAction(
+  _prevState: DeleteServiceState,
+  formData: FormData
+): Promise<DeleteServiceState> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "You need to be signed in to do that." };
+  }
+
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) {
+    return { ok: false, message: "Missing treatment id." };
+  }
+
+  await deleteService(id);
+
+  const existingFiles = await readdir(UPLOADS_DIR).catch(() => []);
+  await Promise.all(
+    existingFiles
+      .filter((name) => name.startsWith(`service-${id}.`))
+      .map((name) => unlink(path.join(UPLOADS_DIR, name)).catch(() => {}))
+  );
+
+  revalidatePath("/");
+  revalidatePath("/doctor");
+
+  return { ok: true, message: "Treatment removed." };
 }

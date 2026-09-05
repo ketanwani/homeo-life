@@ -22,6 +22,7 @@ import {
 import { getAvailableSlotsByService } from "@/lib/booking";
 import { getFaqs, getPublishedPosts, getServices, getTestimonials } from "@/lib/db";
 import { getDoctorPhotoUrl } from "@/lib/doctor-photo";
+import { attachServiceImages } from "@/lib/service-image";
 import { formatMoney, getWhatsAppUrl } from "@/lib/site";
 import { BookingWidget } from "./ui/booking-widget";
 import { HomeoLifeLogo } from "./ui/logo";
@@ -33,7 +34,7 @@ import { HomeoLifeLogo } from "./ui/logo";
 export const revalidate = 300;
 
 export default async function HomePage() {
-  const [services, blogs, stories, faqs, testimonials, doctorPhotoUrl] = await Promise.all([
+  const [rawServices, blogs, stories, faqs, testimonials, doctorPhotoUrl] = await Promise.all([
     getServices(),
     getPublishedPosts("blog"),
     getPublishedPosts("case_story"),
@@ -41,6 +42,7 @@ export default async function HomePage() {
     getTestimonials(),
     getDoctorPhotoUrl()
   ]);
+  const services = await attachServiceImages(rawServices);
   const slotsByService = await getAvailableSlotsByService(services);
 
   const whatsAppUrl = getWhatsAppUrl(
@@ -164,7 +166,13 @@ export default async function HomePage() {
             {services.map((service) => (
               <article className={service.isFeatured ? "serviceCard featured" : "serviceCard"} key={service.id}>
                 <div>
-                  <span className="serviceIcon"><HeartPulse size={18} /></span>
+                  {service.imageUrl ? (
+                    <div className="serviceImageWrap">
+                      <Image src={service.imageUrl} alt={service.title} width={480} height={200} className="serviceImage" />
+                    </div>
+                  ) : (
+                    <span className="serviceIcon"><HeartPulse size={18} /></span>
+                  )}
                   <h3>{service.title}</h3>
                   <p>{service.description}</p>
                 </div>

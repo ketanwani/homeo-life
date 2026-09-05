@@ -171,6 +171,7 @@ export const appointments: Appointment[] = [
     serviceTitle: "Consultation & Medicines",
     startsAt: "2026-08-24T10:30:00+08:00",
     status: "scheduled",
+    paymentStatus: "paid",
     notes: "First consult, migraine history."
   },
   {
@@ -179,6 +180,7 @@ export const appointments: Appointment[] = [
     serviceTitle: "Skin & Psoriasis",
     startsAt: "2026-08-25T18:00:00+08:00",
     status: "rescheduled",
+    paymentStatus: "paid",
     notes: "Uploaded photos before appointment."
   },
   {
@@ -187,6 +189,7 @@ export const appointments: Appointment[] = [
     serviceTitle: "Children's Behavioural Care",
     startsAt: "2026-08-26T16:30:00+08:00",
     status: "scheduled",
+    paymentStatus: "pending",
     notes: "Parent requested evening follow-up."
   }
 ];

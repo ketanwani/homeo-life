@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { UPLOADS_DIR } from "@/lib/doctor-photo";
+import { UPLOADS_DIR } from "@/lib/uploads";
 
 // Must stay dynamic (re-read from disk every request) -- see the comment in lib/doctor-photo.ts on
 // why this can't be a static public/ file.

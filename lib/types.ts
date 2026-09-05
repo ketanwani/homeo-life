@@ -7,6 +7,7 @@ export type Service = {
   currency: string;
   calendlyEventTypeUrl?: string;
   isFeatured?: boolean;
+  imageUrl?: string;
 };
 
 export type ContentPost = {
@@ -36,6 +37,7 @@ export type Appointment = {
   serviceTitle: string;
   startsAt: string;
   status: "scheduled" | "rescheduled" | "canceled" | "completed";
+  paymentStatus: "pending" | "paid" | "failed";
   notes?: string;
 };
 

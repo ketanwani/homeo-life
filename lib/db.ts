@@ -32,6 +32,64 @@ export async function getServices(): Promise<Service[]> {
   }));
 }
 
+export type NewServiceInput = {
+  title: string;
+  description: string;
+  durationMinutes: number;
+  priceCents: number;
+  currency: string;
+  isFeatured: boolean;
+};
+
+// Returns the new service's id so the caller can attach an uploaded image to it (see
+// lib/service-image.ts, which matches image filenames against this id).
+export async function createService(input: NewServiceInput): Promise<string> {
+  const client = getPool();
+  if (!client) {
+    const id = `local-service-${services.length + 1}`;
+    services.push({ id, ...input });
+    return id;
+  }
+
+  const result = await client.query(
+    `insert into services (title, description, duration_minutes, price_cents, currency, is_featured)
+     values ($1, $2, $3, $4, $5, $6)
+     returning id`,
+    [input.title, input.description, input.durationMinutes, input.priceCents, input.currency, input.isFeatured]
+  );
+  return result.rows[0].id;
+}
+
+export async function updateService(id: string, input: NewServiceInput): Promise<void> {
+  const client = getPool();
+  if (!client) {
+    const index = services.findIndex((existing) => existing.id === id);
+    if (index !== -1) services[index] = { ...services[index], ...input };
+    return;
+  }
+
+  await client.query(
+    `update services
+     set title = $2, description = $3, duration_minutes = $4, price_cents = $5, currency = $6, is_featured = $7
+     where id = $1`,
+    [id, input.title, input.description, input.durationMinutes, input.priceCents, input.currency, input.isFeatured]
+  );
+}
+
+// service_title on appointments is a denormalized text snapshot, not a foreign key (see
+// createAppointment above), so deleting a service here can never fail on a referential constraint --
+// past bookings just keep their original title text.
+export async function deleteService(id: string): Promise<void> {
+  const client = getPool();
+  if (!client) {
+    const index = services.findIndex((existing) => existing.id === id);
+    if (index !== -1) services.splice(index, 1);
+    return;
+  }
+
+  await client.query(`delete from services where id = $1`, [id]);
+}
+
 export async function getPublishedPosts(type?: ContentPost["type"]): Promise<ContentPost[]> {
   const client = getPool();
   if (!client) {
@@ -91,7 +149,7 @@ export async function getAppointments(): Promise<Appointment[]> {
   if (!client) return appointments;
 
   const result = await client.query(`
-    select a.id, coalesce(p.full_name, 'Patient') as patient_name, a.service_title, a.starts_at, a.status, a.notes
+    select a.id, coalesce(p.full_name, 'Patient') as patient_name, a.service_title, a.starts_at, a.status, a.payment_status, a.notes
     from appointments a
     left join patients p on p.id = a.patient_id
     order by a.starts_at asc
@@ -104,6 +162,7 @@ export async function getAppointments(): Promise<Appointment[]> {
     serviceTitle: row.service_title,
     startsAt: row.starts_at.toISOString(),
     status: row.status,
+    paymentStatus: row.payment_status,
     notes: row.notes ?? undefined
   }));
 }
@@ -120,7 +179,9 @@ export type NewAppointmentInput = {
 
 export class SlotConflictError extends Error {}
 
-export async function createAppointment(input: NewAppointmentInput): Promise<void> {
+// Returns the new appointment's id so the caller can create a Stripe Checkout Session against it
+// and record that session's id back onto the row (see setAppointmentStripeSession below).
+export async function createAppointment(input: NewAppointmentInput): Promise<string> {
   const client = getPool();
   const startsAt = new Date(input.startsAt);
   const endsAt = new Date(startsAt.getTime() + input.durationMinutes * 60_000);
@@ -134,15 +195,17 @@ export async function createAppointment(input: NewAppointmentInput): Promise<voi
     });
     if (conflict) throw new SlotConflictError("Slot already booked");
 
+    const id = `local-${appointments.length + 1}`;
     appointments.push({
-      id: `local-${appointments.length + 1}`,
+      id,
       patientName: input.fullName,
       serviceTitle: input.serviceTitle,
       startsAt: startsAt.toISOString(),
       status: "scheduled",
+      paymentStatus: "pending",
       notes: input.notes
     });
-    return;
+    return id;
   }
 
   const pgClient = await client.connect();
@@ -173,19 +236,46 @@ export async function createAppointment(input: NewAppointmentInput): Promise<voi
     );
     const patientId = patientResult.rows[0].id;
 
-    await pgClient.query(
-      `insert into appointments (patient_id, service_title, starts_at, status, notes)
-       values ($1, $2, $3, 'scheduled', $4)`,
+    const appointmentResult = await pgClient.query(
+      `insert into appointments (patient_id, service_title, starts_at, status, payment_status, notes)
+       values ($1, $2, $3, 'scheduled', 'pending', $4)
+       returning id`,
       [patientId, input.serviceTitle, startsAt.toISOString(), input.notes ?? null]
     );
 
     await pgClient.query("commit");
+    return appointmentResult.rows[0].id;
   } catch (error) {
     await pgClient.query("rollback").catch(() => {});
     throw error;
   } finally {
     pgClient.release();
   }
+}
+
+// Called right after createAppointment() once the Stripe Checkout Session exists, so the webhook
+// can look the appointment back up by session id when payment completes.
+export async function setAppointmentStripeSession(appointmentId: string, sessionId: string): Promise<void> {
+  const client = getPool();
+  if (!client) return; // in-memory fallback has no session-id field; nothing to look up later either
+
+  await client.query(`update appointments set stripe_checkout_session_id = $2 where id = $1`, [
+    appointmentId,
+    sessionId
+  ]);
+}
+
+// Called from the Stripe webhook on checkout.session.completed. Returns the appointment id that was
+// updated (or null if no appointment matched, e.g. a stale/replayed webhook) so the caller can revalidate.
+export async function markAppointmentPaidBySessionId(sessionId: string): Promise<string | null> {
+  const client = getPool();
+  if (!client) return null;
+
+  const result = await client.query(
+    `update appointments set payment_status = 'paid' where stripe_checkout_session_id = $1 returning id`,
+    [sessionId]
+  );
+  return result.rows[0]?.id ?? null;
 }
 
 export async function getAvailability(): Promise<DayAvailability[]> {

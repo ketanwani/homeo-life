@@ -2,8 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, LogOut, UserRound } from "lucide-react";
 import { auth, signOut } from "@/auth";
-import { getAppointments, getAvailability } from "@/lib/db";
+import { getAppointments, getAvailability, getServices } from "@/lib/db";
 import { getDoctorPhotoUrl } from "@/lib/doctor-photo";
+import { attachServiceImages } from "@/lib/service-image";
 import { DoctorDashboard } from "../ui/doctor-dashboard";
 import { HomeoLifeLogo } from "../ui/logo";
 
@@ -13,11 +14,13 @@ export default async function DoctorPage() {
     redirect("/login");
   }
 
-  const [appointments, availability, photoUrl] = await Promise.all([
+  const [appointments, availability, photoUrl, rawServices] = await Promise.all([
     getAppointments(),
     getAvailability(),
-    getDoctorPhotoUrl()
+    getDoctorPhotoUrl(),
+    getServices()
   ]);
+  const services = await attachServiceImages(rawServices);
 
   return (
     <main className="doctorPage">
@@ -43,11 +46,16 @@ export default async function DoctorPage() {
           <p className="eyebrow">Doctor workspace</p>
           <h1>Manage calendar, content, FAQs, and patient appointments.</h1>
           <p>
-            Availability is now live and saved to Postgres. Appointments, content, and FAQ tabs are
-            still UI-only and not yet wired to the database.
+            Calendar, appointments, and treatments are live and saved to Postgres. Content and FAQ
+            tabs are still UI-only and not yet wired to the database.
           </p>
         </div>
-        <DoctorDashboard appointments={appointments} availability={availability} photoUrl={photoUrl} />
+        <DoctorDashboard
+          appointments={appointments}
+          availability={availability}
+          photoUrl={photoUrl}
+          services={services}
+        />
       </section>
     </main>
   );

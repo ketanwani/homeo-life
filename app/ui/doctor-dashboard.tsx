@@ -10,13 +10,15 @@ import {
   MessageSquareText,
   PenLine,
   Save,
+  Stethoscope,
   UploadCloud
 } from "lucide-react";
 import { saveAvailability } from "@/app/doctor/actions";
-import type { Appointment, DayAvailability } from "@/lib/types";
+import type { Appointment, DayAvailability, Service } from "@/lib/types";
 import { DoctorPhotoUploader } from "./doctor-photo-uploader";
+import { ServiceManager } from "./service-manager";
 
-type Panel = "calendar" | "appointments" | "editor" | "faq" | "profile";
+type Panel = "calendar" | "appointments" | "treatments" | "editor" | "faq" | "profile";
 
 const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -65,11 +67,13 @@ function AvailabilityEditor({ availability }: { availability: DayAvailability[] 
 export function DashboardTabs({
   appointments,
   availability,
-  photoUrl
+  photoUrl,
+  services
 }: {
   appointments: Appointment[];
   availability: DayAvailability[];
   photoUrl: string;
+  services: Service[];
 }) {
   const [active, setActive] = useState<Panel>("calendar");
   const nextAppointment = useMemo(() => appointments.find((item) => item.status !== "canceled"), [appointments]);
@@ -82,6 +86,9 @@ export function DashboardTabs({
         </button>
         <button className={active === "appointments" ? "dashTab active" : "dashTab"} onClick={() => setActive("appointments")}>
           <ClipboardList size={18} /> Appointments
+        </button>
+        <button className={active === "treatments" ? "dashTab active" : "dashTab"} onClick={() => setActive("treatments")}>
+          <Stethoscope size={18} /> Treatments
         </button>
         <button className={active === "editor" ? "dashTab active" : "dashTab"} onClick={() => setActive("editor")}>
           <PenLine size={18} /> Content
@@ -122,10 +129,22 @@ export function DashboardTabs({
                   <strong>{appointment.patientName}</strong>
                   <span>{appointment.serviceTitle}</span>
                   <time>{new Intl.DateTimeFormat("en-SG", { dateStyle: "medium", timeStyle: "short" }).format(new Date(appointment.startsAt))}</time>
-                  <em>{appointment.status}</em>
+                  <em>{appointment.status} &middot; {appointment.paymentStatus === "paid" ? "Paid" : "Payment pending"}</em>
                 </article>
               ))}
             </div>
+          </section>
+        ) : null}
+
+        {active === "treatments" ? (
+          <section className="dashPanel">
+            <div className="panelHeader">
+              <div>
+                <h3>Treatment options</h3>
+                <p>Add, edit, or remove what patients can choose from on the booking page.</p>
+              </div>
+            </div>
+            <ServiceManager services={services} />
           </section>
         ) : null}
 
@@ -189,11 +208,15 @@ export function DashboardTabs({
 export function DoctorDashboard({
   appointments,
   availability,
-  photoUrl
+  photoUrl,
+  services
 }: {
   appointments: Appointment[];
   availability: DayAvailability[];
   photoUrl: string;
+  services: Service[];
 }) {
-  return <DashboardTabs appointments={appointments} availability={availability} photoUrl={photoUrl} />;
+  return (
+    <DashboardTabs appointments={appointments} availability={availability} photoUrl={photoUrl} services={services} />
+  );
 }
